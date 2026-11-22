@@ -1,0 +1,31 @@
+{
+  "_note": "Shape of POST /rest/api/3/changelog/bulkfetch: answers by issue id, `created` in epoch milliseconds. Names and ids are fictional.",
+  "issueChangeLogs": [
+    {
+      "issueId": "10024",
+      "changeHistories": [
+        {
+          "id": "10201",
+          "author": { "accountId": "u-me", "displayName": "Site Owner", "accountType": "atlassian" },
+          "created": 1796817000000,
+          "items": [
+            { "field": "status", "fieldtype": "jira", "fieldId": "status", "from": "10000", "fromString": "To Do", "to": "10001", "toString": "In Progress" }
+          ]
+        },
+        {
+          "id": "10200",
+          "author": { "accountId": "u-me", "displayName": "Site Owner", "accountType": "atlassian" },
+          "created": 1796816940000,
+          "items": [
+            { "field": "assignee", "fieldtype": "jira", "fieldId": "assignee", "from": null, "fromString": null, "to": "u-me", "toString": "Site Owner" }
+          ]
+        }
+      ]
+    },
+    {
+      "issueId": "10025",
+      "changeHistories": []
+    }
+  ],
+  "nextPageToken": null
+}

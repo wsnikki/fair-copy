@@ -1,0 +1,210 @@
+# Scopes: every change is a major version that each installer must approve again. Keep the list to what the code calls
+# (docs/STATUS.md lists each scope with the call that needs it).
+# No llm module, no webtrigger, no external egress — keeps "Runs on Atlassian".
+# Lines marked BRAND carry the product name; src/lib/brand.js is the only other place. Module keys keep their old
+# prefix: they are identifiers (changing a key would orphan the macro on every published page), not display text.
+modules:
+  jira:projectPage:
+    - key: countersign-acceptance
+      resource: project
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy # BRAND
+  jira:issuePanel:
+    - key: countersign-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy # BRAND
+      icon: resource:assets;icon.svg
+  # The app outside any project: first run works on a site that has no project yet.
+  jira:globalPage:
+    - key: countersign-start
+      resource: global
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy # BRAND
+      icon: resource:assets;icon.svg
+  jira:projectSettingsPage:
+    - key: countersign-settings
+      resource: settings
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy # BRAND
+  macro:
+    - key: countersign-seal
+      resource: seal
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy seal # BRAND
+      description: Shows whether this acceptance record page still matches the sealed record, and names what differs.
+  confluence:globalPage:
+    - key: countersign-verify
+      resource: verify
+      resolver:
+        function: resolver
+      render: native
+      title: Fair Copy # BRAND
+      route: countersign
+  sql:
+    - key: main-db
+      engine: mysql
+  trigger:
+    - key: issue-changed
+      function: onIssueChanged
+      events:
+        - avi:jira:updated:issue
+      filter:
+        ignoreSelf: true
+  scheduledTrigger:
+    - key: migrate-hourly
+      function: migrate
+      interval: hour
+  rovo:agent:
+    - key: acceptance-officer
+      name: Acceptance officer
+      description: Tells you whether a release can be signed, what you would be signing, what changed since it was tested and who did what. Every answer cites the Jira issue, test run or sealed record it came from. It never signs anything.
+      prompt: resource:prompts;acceptance-officer.md
+      conversationStarters:
+        - Can release 2.4 be signed?
+        - What is blocking sign-off of release 2.4?
+        - Is the last acceptance record still intact?
+      actions:
+        - get-acceptance-status
+        - list-blockers
+        - verify-seal
+      skills:
+        - acceptance-review
+  rovo:skill:
+    - key: acceptance-review
+      source:
+        dir: skills/acceptance-review
+      dependencies:
+        tools:
+          - get-acceptance-status
+          - list-blockers
+          - verify-seal
+  rovo:mcp:
+    - key: countersign-mcp
+      name: Fair Copy # BRAND
+      tools:
+        - get-acceptance-status
+        - list-blockers
+        - verify-seal
+  action:
+    - key: get-acceptance-status
+      name: Get acceptance status
+      function: actStatus
+      actionVerb: GET
+      description: Returns whether a release (a Jira fix version) is accepted or can be signed off now, with counts of acceptance cases that passed, passed then changed, failed or were not tested, and citations. `decidedLine` is the ready first line once it is decided.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: true
+          description: Jira project key, for example CLM
+        release:
+          title: Release
+          type: string
+          required: false
+          description: Fix version name, for example 2.4. Leave empty for the earliest unreleased version that has acceptance cases and is not yet decided; the answer then says which release was chosen (`releaseChosenLine`).
+    - key: list-blockers
+      name: List blockers
+      function: actBlockers
+      actionVerb: GET
+      description: Lists everything open against sign-off of a release - changed passes, failed or untested cases, defects, duty conflicts, overdue conditions - with a citation and what is proposed for each (`coveredBy`). A proposal does not remove a blocker.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: true
+          description: Jira project key, for example CLM
+        release:
+          title: Release
+          type: string
+          required: false
+          description: Fix version name, for example 2.4. Leave empty for the earliest unreleased version that has acceptance cases and is not yet decided; the answer then says which release was chosen (`releaseChosenLine`).
+    - key: verify-seal
+      name: Verify seal
+      function: actVerify
+      actionVerb: GET
+      description: Checks a sealed acceptance record - its SHA-256 seal, the whole Confluence page, the chain, the evidence files and the seal the signer posted in Jira - and says whether it is intact, broken or not fully checked. Returns a ready first line (`firstLine`).
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: true
+          description: Jira project key, for example CLM
+        recordNumber:
+          title: Record number
+          type: integer
+          required: false
+          description: Number of the acceptance record. Leave empty for the latest record.
+        wholeChain:
+          title: Whole chain
+          type: boolean
+          required: false
+          description: Verify every record back to the first. Default false.
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: onIssueChanged
+      handler: index.onIssueChanged
+    - key: migrate
+      handler: index.migrate
+    - key: actStatus
+      handler: index.actStatus
+    - key: actBlockers
+      handler: index.actBlockers
+    - key: actVerify
+      handler: index.actVerify
+resources:
+  - key: project
+    path: src/frontend/project/index.jsx
+  - key: global
+    path: src/frontend/global/index.jsx
+  - key: panel
+    path: src/frontend/panel/index.jsx
+  - key: settings
+    path: src/frontend/settings/index.jsx
+  - key: seal
+    path: src/frontend/confluence/macro.jsx
+  - key: verify
+    path: src/frontend/confluence/page.jsx
+  - key: prompts
+    path: prompts
+  - key: assets
+    path: assets
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - manage:jira-project
+    - manage:jira-configuration
+    - storage:app
+    - read:page:confluence
+    - write:page:confluence
+    - read:space:confluence
+    - write:space:confluence
+    - delete:page:confluence
+    - read:graph:issue:jira
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/7e48a9b3-f2d8-4c33-92a1-af79274e99c9
+  # ONE installation and ONE storage for both products. Without this, Jira and Confluence are two installations with
+  # separate SQL and KVS, and the seal panel on a Confluence page cannot see the records sealed in Jira.
+  # https://developer.atlassian.com/platform/forge/app-compatibility/
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
